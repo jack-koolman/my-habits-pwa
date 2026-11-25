@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <title>My Habits — PWA Tracker</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-2: #162032;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #22c55e;
+      --border: rgba(148, 163, 184, 0.16);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 16px;
+    }
+    .container { max-width: 1120px; margin: 0 auto; display: grid; gap: 16px; }
+    header {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+      background: var(--card); padding: 14px 18px; border-radius: 14px; border: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 1.35rem; }
+    .sub { color: var(--muted); font-size: 0.85rem; }
+    .months { display: flex; flex-wrap: wrap; gap: 6px; }
+    .month-btn {
+      background: var(--card-2); color: var(--text); border: 1px solid var(--border);
+      padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 0.82rem;
+    }
+    .month-btn.active { background: var(--accent); color: #082f49; font-weight: 700; border-color: transparent; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 1.05rem; }
+    .stats-wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .stat-line { display: flex; justify-content: space-between; gap: 24px; margin: 6px 0; font-size: 0.95rem; }
+    .ring-box { text-align: center; }
+    .pct-badge {
+      width: 84px; height: 84px; border-radius: 50%;
+      display: grid; place-items: center; font-weight: 800; font-size: 1.15rem;
+      background: conic-gradient(var(--accent-2) var(--pct, 0%), rgba(148,163,184,0.18) 0);
+      position: relative;
+    }
+    .pct-badge::before {
+      content: ""; position: absolute; inset: 8px; border-radius: 50%; background: var(--card);
+    }
+    .pct-badge span { position: relative; z-index: 1; }
+    .bars {
+      display: grid; grid-template-columns: repeat(31, 1fr); align-items: end;
+      gap: 3px; height: 120px; padding-top: 8px;
+    }
+    .bar {
+      background: linear-gradient(180deg, var(--accent), #0284c7);
+      border-radius: 3px 3px 0 0; min-height: 2px;
+    }
+    .bar-labels {
+      display: grid; grid-template-columns: repeat(31, 1fr); gap: 3px;
+      font-size: 0.65rem; color: var(--muted); text-align: center; margin-top: 4px;
+    }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 6px 5px; border-bottom: 1px solid var(--border); text-align: center; white-space: nowrap; }
+    th.habit-col, td.habit-col { text-align: left; position: sticky; left: 0; background: var(--card); z-index: 1; }
+    input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+    .prog-track { width: 110px; height: 8px; background: rgba(148,163,184,0.2); border-radius: 999px; overflow: hidden; display: inline-block; }
+    .prog-fill { height: 100%; background: var(--accent); }
+    .add-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    input[type="text"], button.action-btn {
+      background: var(--card-2); color: var(--text); border: 1px solid var(--border);
+      padding: 8px 12px; border-radius: 8px; font-size: 0.9rem;
+    }
+    button.action-btn { background: var(--accent); color: #082f49; font-weight: 700; border: none; cursor: pointer; }
+    button.secondary-btn {
+      background: var(--card-2); color: var(--text); border: 1px solid var(--border);
+      padding: 7px 11px; border-radius: 8px; cursor: pointer; font-size: 0.82rem;
+    }
+    .wellness-row { margin-bottom: 12px; }
+    .wellness-row label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent-2); }
+    .rank-list { padding-left: 18px; margin: 0; display: grid; gap: 6px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>My Habits</h1>
+        <div class="sub" id="activeMonthLabel">March • Daily & Monthly Habit Tracker</div>
+      </div>
+      <div class="months" id="monthTabs"></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="secondary-btn" id="exportBtn">Export JSON</button>
+        <button class="secondary-btn" id="importBtn">Import JSON</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;" />
+      </div>
+    </header>
+
+    <div class="grid-2">
+      <section class="card">
+        <h2>Overall Stats</h2>
+        <div class="stats-wrap">
+          <div style="flex:1;">
+            <div class="stat-line"><span>Goal</span><strong id="statGoal">0</strong></div>
+            <div class="stat-line"><span>Completed</span><strong id="statCompleted">0</strong></div>
+            <div class="stat-line"><span>Left</span><strong id="statLeft">0</strong></div>
+          </div>
+          <div class="ring-box">
+            <div class="pct-badge" id="overallRing" style="--pct: 0%;">
+              <span id="statPct">0%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Daily Progress (Days 1–31)</h2>
+        <div class="bars" id="dailyBars"></div>
+        <div class="bar-labels" id="dailyLabels"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Habit Matrix</h2>
+      <div class="add-row">
+        <input type="text" id="newEmoji" value="⚡" style="width:56px; text-align:center;" maxlength="4" aria-label="Emoji" />
+        <input type="text" id="newHabitName" placeholder="Add new habit (e.g., Cold Shower, Reading)..." style="flex:1; min-width:200px;" />
+        <button class="action-btn" id="addHabitBtn">+ Add Habit</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr id="matrixHeader"></tr>
+          </thead>
+          <tbody id="matrixBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="grid-2">
+      <section class="card">
+        <h2>Analysis</h2>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th class="habit-col">Habit</th>
+                <th>Goal</th>
+                <th>Actual</th>
+                <th>Left</th>
+                <th>Progress</th>
+                <th>%</th>
+              </tr>
+            </thead>
+            <tbody id="analysisBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div style="display:grid; gap:16px;">
+        <section class="card">
+          <h2>TOP 10 HABITS</h2>
+          <ol class="rank-list" id="topTenList"></ol>
+        </section>
+
+        <section class="card">
+          <h2>Overall Wellness</h2>
+          <div class="wellness-row">
+            <label><span>Mood</span><strong id="moodVal">4.0 / 5</strong></label>
+            <input type="range" id="moodSlider" min="1" max="5" step="0.5" value="4" />
+          </div>
+          <div class="wellness-row">
+            <label><span>Hours of Sleep</span><strong id="sleepVal">7.5 hrs</strong></label>
+            <input type="range" id="sleepSlider" min="3" max="12" step="0.5" value="7.5" />
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const STORAGE_KEY = "my_habits_pwa_v1";
+
+    const DEFAULT_HABITS = [
+      ["⏰", "Wake up at 05:00", 27],
+      ["💪", "Gym", 25],
+      ["📚", "Reading / Learning", 24],
+      ["📅", "Day Planning", 26],
+      ["🚫", "No Gooning", 28],
+      ["🎯", "Project Work", 25],
+      ["🍷", "No Alcohol", 29],
+      ["🌿", "Social Media Detox", 23],
+      ["📓", "Goal Journaling", 22],
+      ["🧊", "Cold Shower", 24],
+      ["🛠️", "Learn a Skill", 21],
+      ["🧘", "Meditation", 22],
+      ["🤸", "Stretching", 29]
+    ].map(([emoji, name, checkedCount]) => ({
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Math.random()),
+      emoji,
+      name,
+      goal: 30,
+      checks: Array.from({ length: 31 }, (_, i) => i < checkedCount)
+    }));
+
+    function makeInitialState() {
+      const monthsData = {};
+      MONTHS.forEach((m) => {
+        monthsData[m] = {
+          habits: structuredClone(DEFAULT_HABITS),
+          mood: 4.0,
+          sleep: 7.5
+        };
+      });
+      return { activeMonth: "March", monthsData };
+    }
+
+    let state = (() => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : makeInitialState();
+      } catch {
+        return makeInitialState();
+      }
+    })();
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function currentMonthObj() {
+      return state.monthsData[state.activeMonth];
+    }
+
+    function renderAll() {
+      saveState();
+      const mObj = currentMonthObj();
+      document.getElementById("activeMonthLabel").textContent = `${state.activeMonth} • Daily & Monthly Habit Tracker`;
+
+      // Month tabs
+      const tabsEl = document.getElementById("monthTabs");
+      tabsEl.innerHTML = "";
+      MONTHS.forEach((m) => {
+        const btn = document.createElement("button");
+        btn.className = "month-btn" + (m === state.activeMonth ? " active" : "");
+        btn.textContent = m.slice(0, 3);
+        btn.onclick = () => { state.activeMonth = m; renderAll(); };
+        tabsEl.appendChild(btn);
+      });
+
+      // Matrix header
+      const headerEl = document.getElementById("matrixHeader");
+      headerEl.innerHTML = `<th class="habit-col">Habit</th>` +
+        Array.from({ length: 31 }, (_, i) => `<th>${i + 1}</th>`).join("");
+
+      // Matrix body
+      const bodyEl = document.getElementById("matrixBody");
+      bodyEl.innerHTML = "";
+      mObj.habits.forEach((h, hIdx) => {
+        const tr = document.createElement("tr");
+        const habitTd = document.createElement("td");
+        habitTd.className = "habit-col";
+        habitTd.textContent = `${h.emoji} ${h.name}`;
+        tr.appendChild(habitTd);
+
+        h.checks.forEach((checked, dIdx) => {
+          const td = document.createElement("td");
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = checked;
+          cb.onchange = () => {
+            h.checks[dIdx] = cb.checked;
+            renderAll();
+          };
+          td.appendChild(cb);
+          tr.appendChild(td);
+        });
+        bodyEl.appendChild(tr);
+      });
+
+      // Overall stats
+      const goalSum = mObj.habits.reduce((acc, h) => acc + h.goal, 0);
+      const actualSum = mObj.habits.reduce((acc, h) => acc + h.checks.filter(Boolean).length, 0);
+      const leftSum = Math.max(goalSum - actualSum, 0);
+      const overallPct = goalSum ? Math.round((actualSum / goalSum) * 100) : 0;
+
+      document.getElementById("statGoal").textContent = goalSum;
+      document.getElementById("statCompleted").textContent = actualSum;
+      document.getElementById("statLeft").textContent = leftSum;
+      document.getElementById("statPct").textContent = `${overallPct}%`;
+      document.getElementById("overallRing").style.setProperty("--pct", `${overallPct}%`);
+
+      // Daily progress bars
+      const barsEl = document.getElementById("dailyBars");
+      const labelsEl = document.getElementById("dailyLabels");
+      barsEl.innerHTML = "";
+      labelsEl.innerHTML = "";
+      const maxHabits = Math.max(mObj.habits.length, 1);
+      for (let d = 0; d < 31; d++) {
+        const count = mObj.habits.filter((h) => h.checks[d]).length;
+        const pctHeight = Math.round((count / maxHabits) * 100);
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.height = `${Math.max(pctHeight, 3)}%`;
+        bar.title = `Day ${d + 1}: ${count}/${mObj.habits.length}`;
+        barsEl.appendChild(bar);
+
+        const lbl = document.createElement("div");
+        lbl.textContent = d + 1;
+        labelsEl.appendChild(lbl);
+      }
+
+      // Analysis table
+      const analysisEl = document.getElementById("analysisBody");
+      analysisEl.innerHTML = "";
+      mObj.habits.forEach((h) => {
+        const actual = h.checks.filter(Boolean).length;
+        const left = Math.max(h.goal - actual, 0);
+        const pct = h.goal ? Math.min(Math.round((actual / h.goal) * 100), 100) : 0;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="habit-col">${h.emoji} ${h.name}</td>
+          <td>${h.goal}</td>
+          <td>${actual}</td>
+          <td>${left}</td>
+          <td><div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div></td>
+          <td>${pct}%</td>
+        `;
+        analysisEl.appendChild(tr);
+      });
+
+      // Top 10 habits
+      const ranked = [...mObj.habits]
+        .map((h) => {
+          const actual = h.checks.filter(Boolean).length;
+          const pct = h.goal ? Math.min(Math.round((actual / h.goal) * 100), 100) : 0;
+          return { ...h, actual, pct };
+        })
+        .sort((a, b) => b.actual - a.actual || a.name.localeCompare(b.name))
+        .slice(0, 10);
+
+      const topEl = document.getElementById("topTenList");
+      topEl.innerHTML = ranked
+        .map((item) => `<li><strong>${item.emoji} ${item.name}</strong> — ${item.pct}% (${item.actual}/${item.goal})</li>`)
+        .join("");
+
+      // Wellness
+      const moodSlider = document.getElementById("moodSlider");
+      const sleepSlider = document.getElementById("sleepSlider");
+      moodSlider.value = mObj.mood;
+      sleepSlider.value = mObj.sleep;
+      document.getElementById("moodVal").textContent = `${Number(mObj.mood).toFixed(1)} / 5`;
+      document.getElementById("sleepVal").textContent = `${Number(mObj.sleep).toFixed(1)} hrs`;
+    }
+
+    document.getElementById("addHabitBtn").onclick = () => {
+      const emoji = (document.getElementById("newEmoji").value || "✅").trim();
+      const name = document.getElementById("newHabitName").value.trim();
+      if (!name) return;
+      currentMonthObj().habits.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Math.random()),
+        emoji,
+        name,
+        goal: 30,
+        checks: Array(31).fill(false)
+      });
+      document.getElementById("newHabitName").value = "";
+      renderAll();
+    };
+
+    document.getElementById("moodSlider").oninput = (e) => {
+      currentMonthObj().mood = parseFloat(e.target.value);
+      renderAll();
+    };
+
+    document.getElementById("sleepSlider").oninput = (e) => {
+      currentMonthObj().sleep = parseFloat(e.target.value);
+      renderAll();
+    };
+
+    document.getElementById("exportBtn").onclick = () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "my-habits-backup.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    document.getElementById("importBtn").onclick = () => {
+      document.getElementById("importFile").click();
+    };
+
+    document.getElementById("importFile").onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result);
+          if (parsed && parsed.monthsData) {
+            state = parsed;
+            renderAll();
+          }
+        } catch {}
+      };
+      reader.readAsText(file);
+    };
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>
